@@ -1,10 +1,9 @@
+import logger
 import gurobipy as gp
 import numpy as np
-import numpy.linalg as  linalg
+import numpy.linalg as linalg
 import scipy
 from gurobipy import GRB
-
-import logging
 import time
 from scipy.stats import skew, kurtosis
 '''
@@ -145,7 +144,7 @@ def matrix_checks(matrix, tol = 1e-5):
         "negative_eigenvalue_count": eig_val_neg,
         "zero_eigenvalue_count": eig_val_zero,
         "complex_eigenvalue_count": eig_val_complex,
-        "is_positive_semidefinite": is_positive_semidefinite,
+        "is_positive_semidefinite": positive_semidefinite,
         "is_invertible": is_invertible,
         "condition_number": condition_number,
         "reciprocal_condition_number": rcond,
@@ -283,12 +282,12 @@ def iterative_rank_reduction(q, mode='convex'):
 
         level += 1
 
-        # If adjusted for concave mode, revert matrix
-        if adjusted_for_concave:
-            matrices = [-M for M in matrices]
-            current_matrix = -current_matrix
-            eigenvalues_set = [-eigvals for eigvals in eigenvalues_set]
-            final_status = final_status.replace("positive semidefinite", "negative semidefinite")
+    # If adjusted for concave mode, revert matrix
+    if adjusted_for_concave:
+        matrices = [-M for M in matrices]
+        current_matrix = -current_matrix
+        eigenvalues_set = [-eigvals for eigvals in eigenvalues_set]
+        final_status = final_status.replace("positive semidefinite", "negative semidefinite")
 
         # Results
         result = {
@@ -299,9 +298,85 @@ def iterative_rank_reduction(q, mode='convex'):
             "final_status": final_status
         }
 
+    return result
+
+def solve_qp_with_gurobi(Q, c, A=None, b=None, bounds=None):
+    """
+    Solves a quadratic programming problem using Gurobi.
+
+    The problem is defined as:
+        minimize    (1/2) x^T Q x + c^T x
+        subject to  A x <= b
+                    bounds on x
+
+    Parameters:
+    - Q (numpy.ndarray): The quadratic coefficient matrix.
+    - c (numpy.ndarray): The linear coefficient vector.
+    - A (numpy.ndarray, optional): The inequality constraint matrix.
+    - b (numpy.ndarray, optional): The inequality constraint vector.
+    - bounds (list of tuples, optional): Bounds on variables [(lower, upper), ...].
+
+    Returns:
+    - result (dict): A dictionary containing solution status, objective value, variable values,
+                     and computation time.
+    """
+    try:
+        import time
+        start_time = time.time()
+
+        n = len(c)
+        model = gp.Model()
+        model.Params.OutputFlag = 0  # Suppress Gurobi output
+
+        # Add variables with bounds
+        if bounds is not None:
+            lb = [bnd[0] if bnd[0] is not None else -GRB.INFINITY for bnd in bounds]
+            ub = [bnd[1] if bnd[1] is not None else GRB.INFINITY for bnd in bounds]
+        else:
+            lb = [-GRB.INFINITY] * n
+            ub = [GRB.INFINITY] * n
+
+        x = model.addMVar(shape=n, lb=lb, ub=ub, name="x")
+
+        # Set objective
+        obj = 0.5 * x @ Q @ x + c @ x
+        model.setObjective(obj, GRB.MINIMIZE)
+
+        # Add constraints
+        if A is not None and b is not None:
+            model.addConstr(A @ x <= b, name="ineq_constraints")
+
+        # Optimize
+        model.optimize()
+        end_time = time.time()
+        computation_time = end_time - start_time
+
+        # Retrieve results
+        status = model.Status
+        if status == GRB.OPTIMAL:
+            objective_value = model.ObjVal
+            variable_values = x.X
+            logger.info(f"Gurobi optimization successful. Objective value: {objective_value}")
+        else:
+            objective_value = None
+            variable_values = None
+            logger.warning(f"Gurobi optimization did not find an optimal solution. Status: {status}")
+
+        result = {
+            "status": status,
+            "objective_value": objective_value,
+            "variable_values": variable_values,
+            "computation_time": computation_time
+        }
+
         return result
 
-# run numerical experiments to investigate conditions that imply capacity for iterations of rank reduction
-# matrix characteristics: size, rank proportion, eigenvalue weighting, symmetry, invertibility, condition numbering (accuracy of a solution after approximation)
-# generate symmetric matrix with uniform random distrib. [0,100] - each element with a value that is included conditional upon being less than a density parameter.
-# above is populr for generating values for validating integer programming methods
+    except gp.GurobiError as e:
+        logger.exception("Gurobi Error during optimization.")
+        return {
+            "status": None,
+            "objective_value": None,
+            "variable_values": None,
+            "computation_time": None,
+            "error": str(e)
+        }

@@ -3,7 +3,7 @@ import numpy as np
 import numpy.linalg as linalg
 import scipy
 from gurobipy import GRB
-from math3008_function import gen_real_constrained_matrix, matrix_checks, iterative_rank_reduction
+from spectral_perturbation_analyser import gen_real_constrained_matrix, matrix_checks, iterative_rank_reduction
 
 
 def solve_quadratic(Q, matrix_name="matrix"):
