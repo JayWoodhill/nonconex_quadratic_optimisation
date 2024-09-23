@@ -4,6 +4,15 @@ import numpy.linalg as  linalg
 import scipy
 from gurobipy import GRB
 
+import logging
+import time
+from scipy.stats import skew, kurtosis
+'''
+functions working notes 23/09
+adding new characteristics to matrix checks
+new dependencies: logging, time, scipy
+'''
+
 def gen_real_constrained_matrix(n, u, v, tol = 1e-5):
     # this function creates a square matrix 'n' with a rank of u + v, and count sums of positive/gative eigenvalues of u and v respectively
     # added optional tolerance threshold
@@ -53,28 +62,113 @@ def gen_real_constrained_matrix(n, u, v, tol = 1e-5):
 
     return constrained_matrix
 def matrix_checks(matrix, tol = 1e-5):
-    # checks eigenvalue characteristics of user input matrix, returns summary
-    # input param. tol
-    # add e-10 as an absolute value tolerance for 0 eigenvalues
+    """
+    Checks eigenvalue characteristics of the input matrix and returns a summary.
+
+    Parameters:
+    - matrix (numpy.ndarray): The matrix to check.
+    - tol (float): Tolerance for considering an eigenvalue as zero.
+
+    Returns:
+    - dict: A dictionary containing eigenvalues, eigenvectors, counts, and various matrix properties.
+
+    Dictionary of metric meanings
+    "eigenvalues": "An array of the matrix's eigenvalues.",
+    "eigenvectors": "A matrix whose columns are the eigenvectors corresponding to the eigenvalues.",
+    "positive_eigenvalue_count": "The number of eigenvalues greater than the positive tolerance.",
+    "negative_eigenvalue_count": "The number of eigenvalues less than the negative tolerance.",
+    "zero_eigenvalue_count": "The number of eigenvalues considered zero within the specified tolerance.",
+    "complex_eigenvalue_count": "The number of eigenvalues that are complex (should be zero for real symmetric matrices).",
+    "is_positive_semidefinite": "A boolean indicating if the matrix is positive semidefinite (all eigenvalues ≥ -tolerance).",
+    "is_invertible": "A boolean indicating if the matrix is invertible (determinant not close to zero).",
+    "condition_number": "The condition number of the matrix (ratio of the largest to smallest singular value).",
+    "reciprocal_condition_number": "The reciprocal of the condition number (1 / condition_number).",
+    "density": "The proportion of non-zero elements in the matrix.",
+    "frobenius_norm": "The Frobenius norm of the matrix (square root of the sum of the squares of all elements).",
+    "spectral_norm": "The spectral (2) norm of the matrix (largest singular value).",
+    "rank": "The numerical rank of the matrix (number of singular values greater than the tolerance).",
+    "spectral_radius": "The maximum absolute value among the eigenvalues.",
+    "trace": "The sum of the diagonal elements of the matrix (also the sum of the eigenvalues).",
+    "determinant": "The determinant of the matrix (product of its eigenvalues).",
+    "eigenvalue_mean": "The mean (average) of the eigenvalues.",
+    "eigenvalue_variance": "The variance of the eigenvalues.",
+    "eigenvalue_skewness": "The skewness of the eigenvalue distribution (measure of asymmetry).",
+    "eigenvalue_kurtosis": "The kurtosis of the eigenvalue distribution (measure of 'tailedness').",
+    "min_positive_eigenvalue": "The smallest positive eigenvalue (above the tolerance), if any.",
+    "max_negative_eigenvalue": "The largest negative eigenvalue (below negative tolerance), if any.",
+    "eigenvalue_gap": "The difference between the smallest positive and largest negative eigenvalues.",
+    "largest_off_diagonal": "The maximum absolute value among the off-diagonal elements.",
+    "energy": "The sum of the squares of all elements in the matrix (matrix energy)."
+
+    """
+    # Check characteristics of input matrix
+    if not np.allclose(matrix, matrix.T, atol=tol):
+        raise ValueError("Input matrix is not symmetric.")
+
     eigenvalues, eigenvectors = np.linalg.eig(matrix)
+
+    # Eigenvalue counts
     eig_val_zero = np.sum(np.abs(eigenvalues) < tol)
     eig_val_pos = np.sum(eigenvalues > tol)
-    eig_val_neg = np.sum(eigenvalues < tol)
+    eig_val_neg = np.sum(eigenvalues < -tol)
     eig_val_complex = np.sum(np.iscomplex(eigenvalues))
 
-    positive_semidefinite = np.all(eigenvalues >= 0)
-    invertible = not np.isclose(np.linalg.det(matrix), 0)
+    # Additional matrix metrics
+    positive_semidefinite = np.all(eigenvalues >= -tol)
+    is_invertible = not np.isclose(np.linalg.det(matrix), 0, atol=tol)
+    condition_number = np.linalg.cond(matrix)
+    density = np.count_nonzero(matrix) / matrix.size
+    frobenius_norm = np.linalg.norm(matrix, 'fro')
+    spectral_norm = np.linalg.norm(matrix, 2)
+    rank = np.linalg.matrix_rank(matrix, tol=tol)
+    spectral_radius = np.max(np.abs(eigenvalues))
+    trace = np.trace(matrix)
+    determinant = np.linalg.det(matrix)
+    eigenvalue_mean = np.mean(eigenvalues)
+    eigenvalue_variance = np.var(eigenvalues)
+    eigenvalue_skewness = skew(eigenvalues)
+    eigenvalue_kurtosis = kurtosis(eigenvalues)
+    sorted_eigenvalues = np.sort(eigenvalues)
+    min_positive_eigenvalue = sorted_eigenvalues[eig_val_neg] if eig_val_neg < len(sorted_eigenvalues) else None
+    max_negative_eigenvalue = sorted_eigenvalues[eig_val_neg - 1] if eig_val_neg > 0 else None
+    eigenvalue_gap = min_positive_eigenvalue - max_negative_eigenvalue if (
+                min_positive_eigenvalue is not None and max_negative_eigenvalue is not None) else None
+    off_diagonal_elements = matrix - np.diag(np.diag(matrix))
+    largest_off_diagonal = np.max(np.abs(off_diagonal_elements))
+    rcond = 1 / condition_number if condition_number != 0 else None
+    energy = np.sum(matrix ** 2)
 
-    return {
+    results = {
         "eigenvalues": eigenvalues,
         "eigenvectors": eigenvectors,
         "positive_eigenvalue_count": eig_val_pos,
         "negative_eigenvalue_count": eig_val_neg,
         "zero_eigenvalue_count": eig_val_zero,
         "complex_eigenvalue_count": eig_val_complex,
-        "is_positive_semidefinite": positive_semidefinite,
-        "is_invertible": invertible
+        "is_positive_semidefinite": is_positive_semidefinite,
+        "is_invertible": is_invertible,
+        "condition_number": condition_number,
+        "reciprocal_condition_number": rcond,
+        "density": density,
+        "frobenius_norm": frobenius_norm,
+        "spectral_norm": spectral_norm,
+        "rank": rank,
+        "spectral_radius": spectral_radius,
+        "trace": trace,
+        "determinant": determinant,
+        "eigenvalue_mean": eigenvalue_mean,
+        "eigenvalue_variance": eigenvalue_variance,
+        "eigenvalue_skewness": eigenvalue_skewness,
+        "eigenvalue_kurtosis": eigenvalue_kurtosis,
+        "min_positive_eigenvalue": min_positive_eigenvalue,
+        "max_negative_eigenvalue": max_negative_eigenvalue,
+        "eigenvalue_gap": eigenvalue_gap,
+        "largest_off_diagonal": largest_off_diagonal,
+        "energy": energy
     }
+
+    return results
+
 def matrix_checks_and_output_eigenvalues(matrix):
     check_results = matrix_checks(matrix)
 
