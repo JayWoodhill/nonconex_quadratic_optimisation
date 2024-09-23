@@ -3,7 +3,7 @@ The project aims to:
 
 Implement an iterative rank reduction technique to adjust symmetric matrices to be positive semidefinite (convex) or negative semidefinite (concave).
 Integrate with Gurobi to solve quadratic programming problems using both original and rank-reduced matrices.
-Record and analyze matrix characteristics, such as density, condition number, and eigenvalue distribution.
+Record and analyse matrix characteristics, such as density, condition number, and eigenvalue distribution.
 Compare solver performance (e.g., computation time, solution quality) before and after applying rank reduction.
 Conduct experiments to identify relationships between matrix characteristics and the effectiveness of the rank reduction technique.
 
