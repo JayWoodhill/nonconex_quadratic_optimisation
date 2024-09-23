@@ -25,7 +25,7 @@ def gen_real_constrained_matrix(n, u, v, tol = 1e-5):
         raise ValueError(f"Failed to generate a full-rank orthogonal matrix P after {max_attempts} attempts.")
 
 
-D = np.diag(eig_vals)
+    D = np.diag(eig_vals)
 
     constrained_matrix = P @ D @ P.T
 
@@ -110,67 +110,102 @@ def matrix_checks_and_output_eigenvalues(matrix):
 
 
 def iterative_rank_reduction(q, mode='convex'):
-    # q to -q to simplify convex/concave
-    # 'level' iterator counter
-    # check rounded np values
+    """
+        Iteratively adjusts the input symmetric matrix `q` to make it positive semidefinite (`mode='convex'`)
+        or negative semidefinite (`mode='concave'`) by eliminating undesired eigenvalues through rank-one updates.
+
+        Parameters:
+        - q (numpy.ndarray): The input symmetric matrix to be adjusted.
+        - mode (str): 'convex' to make the matrix positive semidefinite, 'concave' for negative semidefinite.
+
+        Returns:
+        - dict: Contains the matrices, eigenvalues, eigenvectors at each iteration,
+                the number of iterations performed, and the final status.
+
+        Working notes 23/09:
+        Adding tol
+        Adding -q transformation for concave cases and identifier within function
+        Protecting input q from mutability
+        Fixed typos
+        Cleaner presentation of results
+        """
     matrices = []
     eigenvalues_set = []
     eigenvectors_set = []
     level = 0
 
-    current_matrix = q
-    convex = (mode == 'convex')
+    # q adjustment to simplify code
+    if mode == 'concave':
+        q = -q.copy()
+        adjusted_for_concave = True
+    else:
+        q = q.copy()
+        adjusted_for_concave = False
 
+    current_matrix = q
+    tol = 1e-10
+
+    # Adjusted iterator based on pre-iteration conversion of q/-q
     while True:
-        check_results = matrix_checks(current_matrix)
-        eigenvalues = check_results["eigenvalues"]
-        eigenvectors = check_results["eigenvectors"]
-        complex_eigenvalues = check_results["complex_eigenvalue_count"]
-        matrices.append(np.round(current_matrix, 2))
-        eigenvalues_set.append(np.round(eigenvalues, 2))
-        eigenvectors_set.append(np.round(eigenvectors, 2))
-        # break loop for complexity or zero pos/neg eigval count
-        if complex_eigenvalues > 0:
-            print(f"complexity after {level}")
+        # Compute eigenvalues and eigenvectors
+        eigenvalues, eigenvectors = np.linalg.eigh(current_matrix)
+
+        # Store the current state
+        matrices.append(current_matrix.copy())
+        eigenvalues_set.append(eigenvalues.copy())
+        eigenvectors_set.append(eigenvectors.copy())
+
+        # Check for complex eigenvalues (shouldn't happen)
+        if np.iscomplexobj(eigenvalues):
+            final_status = f"Complex eigenvalues encountered after {level} iterations."
             break
-        if convex and np.all(eigenvalues >= 0):
-            print(f"negatives removed after {level} levels")
+
+        # Check for positive semidefinite
+        if np.all(eigenvalues >= -tol):
+            final_status = f"Desired definiteness achieved after {level} iterations."
             break
-        if not convex and np.all(eigenvalues <= 0):
-            print(f"positives removed after {level} levels")
+
+        negative_indices = np.where(eigenvalues < -tol)[0]
+        if len(negative_indices) == 0:
+            final_status = f"Fully reduced after {level} iterations."
             break
-        if convex:
-            if np.any(eigenvalues < 0):
-                negative_eigenvalue_index = np.where(eigenvalues < 0)[0][0]
-                negative_eigenvalue = eigenvalues[negative_eigenvalue_index]
-                v1 = eigenvectors[:, negative_eigenvalue_index]
-                u = np.ones(len(current_matrix))
-                alpha = -negative_eigenvalue / np.dot(u, v1)
-                current_matrix = current_matrix + alpha * np.outer(u, v1)
-        else:
-            # all other input treated as concave
-            if np.any(eigenvalues > 0):
-                positive_eigenvalue_index = np.where(eigenvalues > 0)[0][0]
-                positive_eigenvalue = eigenvalues[positive_eigenvalue_index]
-                v1 = eigenvectors[:, positive_eigenvalue_index]
-                u = np.ones(len(current_matrix))
-                alpha = -positive_eigenvalue / np.dot(u, v1)
-                current_matrix = current_matrix + alpha * np.outer(u, v1)
-                # create a list of linear terms indexed to the level of rank reduction
-                # aggregate the appended terms from q' > q''... and store that as a variable to be passed to gurobi
+
+        # Get largest abs value eigenvalue
+        idx = negative_indices[0]
+        negative_eigenvalue = eigenvalues[idx]
+        eigenvector = eigenvectors[:, idx]
+        u = np.ones_like(eigenvector)
+
+        # Calculate alpha
+        denominator = np.dot(u, eigenvector)
+        if np.abs(denominator) < tol:
+            final_status = f"Numerical instability encountered at iteration {level}."
+            break
+
+        alpha = -negative_eigenvalue / denominator
+
+        # Update matrix
+        current_matrix += alpha * np.outer(u, eigenvector)
 
         level += 1
 
-    print(f"levels rduced: {level}")
-    print(f"eigenvalue: {eigenvalues_set[-1]}")
+        # If adjusted for concave mode, revert matrix
+        if adjusted_for_concave:
+            matrices = [-M for M in matrices]
+            current_matrix = -current_matrix
+            eigenvalues_set = [-eigvals for eigvals in eigenvalues_set]
+            final_status = final_status.replace("positive semidefinite", "negative semidefinite")
 
-    return {
-        "matrices": matrices,
-        "eigenvalues_set": eigenvalues_set,
-        "eigenvectors_set": eigenvectors_set,
-        "levels_performed": level,
-        "final_status": "complexity reached" if complex_eigenvalues > 0 else "unipolar set achieved"
-    }
+        # Results
+        result = {
+            "matrices": matrices,
+            "eigenvalues_set": eigenvalues_set,
+            "eigenvectors_set": eigenvectors_set,
+            "levels_performed": level,
+            "final_status": final_status
+        }
+
+        return result
 
 # run numerical experiments to investigate conditions that imply capacity for iterations of rank reduction
 # matrix characteristics: size, rank proportion, eigenvalue weighting, symmetry, invertibility, condition numbering (accuracy of a solution after approximation)
