@@ -7,21 +7,25 @@ from gurobipy import GRB
 def gen_real_constrained_matrix(n, u, v, tol = 1e-5):
     # this function creates a square matrix 'n' with a rank of u + v, and count sums of positive/gative eigenvalues of u and v respectively
     # added optional tolerance threshold
+    # added max_attempts to avoid infinite looping of matrix generator
     if u + v  > n:
         raise ValueError("excessive eigenvalue count")
-    # sampling changed to half normal pos/neg
+
     eig_val_pos = np.abs(np.random.normal(0, 10, u))
     eig_val_neg = -np.abs(np.random.uniform(0, 10, v))
     eig_val_zero = np.zeros(n - u - v)
     eig_vals = np.concatenate([eig_val_pos, eig_val_neg, eig_val_zero])
 
-    # potential infinite loop of qr decomps to get sufficient rank. probably need to fix
-    while True:
+    max_attempts = 100
+    for attempt in range(max_attempts):
         P, _ = np.linalg.qr(np.random.rand(n, n))
         if np.linalg.matrix_rank(P) == n:
             break
+    else:
+        raise ValueError(f"Failed to generate a full-rank orthogonal matrix P after {max_attempts} attempts.")
 
-    D = np.diag(eig_vals)
+
+D = np.diag(eig_vals)
 
     constrained_matrix = P @ D @ P.T
 
