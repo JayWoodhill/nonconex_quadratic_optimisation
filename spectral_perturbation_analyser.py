@@ -1,4 +1,4 @@
-import logger
+import logging
 import gurobipy as gp
 import numpy as np
 import numpy.linalg as linalg
@@ -6,6 +6,8 @@ import scipy
 from gurobipy import GRB
 import time
 from scipy.stats import skew, kurtosis
+logger = logging.getLogger(__name__)
+logging.basicConfig(level=logging.INFO)
 '''
 functions working notes 23/09
 adding new characteristics to matrix checks
@@ -168,39 +170,6 @@ def matrix_checks(matrix, tol = 1e-5):
 
     return results
 
-def matrix_checks_and_output_eigenvalues(matrix):
-    check_results = matrix_checks(matrix)
-
-    eigenvalues = check_results["eigenvalues"]
-    eigenvectors = check_results["eigenvectors"]
-    eig_val_neg = check_results["negative_eigenvalue_count"]
-
-    if eig_val_neg > 0:
-        negative_eigenvalue_index = np.where(eigenvalues < 0)[0][0]
-        negative_eigenvalue = eigenvalues[negative_eigenvalue_index]
-
-        v1 = eigenvectors[:, negative_eigenvalue_index]
-        u = np.ones(len(matrix))
-
-        alpha = -negative_eigenvalue / np.dot(u, v1)
-        matrix_prime = matrix + alpha * np.outer(u, v1)
-
-        modified_eigenvalues, _ = np.linalg.eig(matrix_prime)
-
-        return {
-            "Q": matrix,
-            "Q_eigenvalues": eigenvalues,
-            "Q_prime": matrix_prime,
-            "Q_prime_eigenvalues": modified_eigenvalues
-        }
-
-    return {
-        "Q": matrix,
-        "Q_eigenvalues": eigenvalues,
-        "Q_prime": None,
-        "Q_prime_eigenvalues": None
-    }
-
 
 def iterative_rank_reduction(q, mode='convex'):
     """
@@ -235,7 +204,7 @@ def iterative_rank_reduction(q, mode='convex'):
         q = q.copy()
         adjusted_for_concave = False
 
-    current_matrix = q
+    current_matrix = q.astype(float)
     tol = 1e-10
 
     # Adjusted iterator based on pre-iteration conversion of q/-q
@@ -282,21 +251,24 @@ def iterative_rank_reduction(q, mode='convex'):
 
         level += 1
 
-    # If adjusted for concave mode, revert matrix
+        # Results
     if adjusted_for_concave:
         matrices = [-M for M in matrices]
         current_matrix = -current_matrix
         eigenvalues_set = [-eigvals for eigvals in eigenvalues_set]
         final_status = final_status.replace("positive semidefinite", "negative semidefinite")
 
-        # Results
-        result = {
-            "matrices": matrices,
-            "eigenvalues_set": eigenvalues_set,
-            "eigenvectors_set": eigenvectors_set,
-            "levels_performed": level,
-            "final_status": final_status
-        }
+        # Prepare the result dictionary after adjustments
+    result = {
+        "matrices": matrices,
+        "eigenvalues_set": eigenvalues_set,
+        "eigenvectors_set": eigenvectors_set,
+        "levels_performed": level,
+        "final_status": final_status
+    }
+
+    return result
+
 
     return result
 
