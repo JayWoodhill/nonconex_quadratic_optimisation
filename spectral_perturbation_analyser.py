@@ -291,6 +291,23 @@ def solve_qp_with_gurobi(Q, c, A=None, b=None, bounds=None):
     Returns:
     - result (dict): A dictionary containing solution status, objective value, variable values,
                      and computation time.
+
+    **Gurobi Status Codes:**
+    - 1 (`GRB.LOADED`): Model is loaded, but no solution information is available.
+    - 2 (`GRB.OPTIMAL`): Optimal solution found.
+    - 3 (`GRB.INFEASIBLE`): Model is infeasible.
+    - 4 (`GRB.INF_OR_UNBD`): Model is infeasible or unbounded.
+    - 5 (`GRB.UNBOUNDED`): Model is unbounded.
+    - 6 (`GRB.CUTOFF`): Objective value reached or exceeded cutoff.
+    - 7 (`GRB.ITERATION_LIMIT`): Iteration limit reached.
+    - 8 (`GRB.NODE_LIMIT`): Node limit reached.
+    - 9 (`GRB.TIME_LIMIT`): Time limit reached.
+    - 10 (`GRB.SOLUTION_LIMIT`): Solution limit reached.
+    - 11 (`GRB.INTERRUPTED`): Optimization interrupted.
+    - 12 (`GRB.NUMERIC`): Numerical difficulties encountered.
+    - 13 (`GRB.SUBOPTIMAL`): Suboptimal solution found.
+    - 14 (`GRB.INPROGRESS`): Optimization in progress.
+    - 15 (`GRB.USER_OBJ_LIMIT`): User objective limit reached.
     """
     try:
         import time
