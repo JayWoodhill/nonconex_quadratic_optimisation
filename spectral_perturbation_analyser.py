@@ -272,7 +272,7 @@ def iterative_rank_reduction(q, mode='convex'):
 
     return result
 
-def solve_qp_with_gurobi(Q, c, A=None, b=None, bounds=None):
+def solve_qp_with_gurobi(Q, c, A=None, b=None, bounds=None, time_limit=30):
     """
     Solves a quadratic programming problem using Gurobi.
 
@@ -324,6 +324,9 @@ def solve_qp_with_gurobi(Q, c, A=None, b=None, bounds=None):
         else:
             lb = [-GRB.INFINITY] * n
             ub = [GRB.INFINITY] * n
+
+        if time_limit is not None:
+            model.Params.TimeLimit = time_limit
 
         x = model.addMVar(shape=n, lb=lb, ub=ub, name="x")
 
