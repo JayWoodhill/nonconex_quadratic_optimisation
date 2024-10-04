@@ -182,19 +182,14 @@ def iterative_rank_reduction(q, mode='convex'):
 
         Returns:
         - dict: Contains the matrices, eigenvalues, eigenvectors at each iteration,
-                the number of iterations performed, and the final status.
-
-        Working notes 23/09:
-        Adding tol
-        Adding -q transformation for concave cases and identifier within function
-        Protecting input q from mutability
-        Fixed typos
-        Cleaner presentation of results
-        """
+                the number of iterations performed, the final status,
+                and the cumulative alpha added over the iterations.
+    """
     matrices = []
     eigenvalues_set = []
     eigenvectors_set = []
     level = 0
+    cumulative_alpha = 0  # Initialize cumulative alpha
 
     # q adjustment to simplify code
     if mode == 'concave':
@@ -245,32 +240,32 @@ def iterative_rank_reduction(q, mode='convex'):
             break
 
         alpha = -negative_eigenvalue / denominator
+        cumulative_alpha += alpha  # Add alpha to the cumulative total
 
         # Update matrix
         current_matrix += alpha * np.outer(u, eigenvector)
 
         level += 1
 
-        # Results
+    # Adjust results for concave mode
     if adjusted_for_concave:
         matrices = [-M for M in matrices]
         current_matrix = -current_matrix
         eigenvalues_set = [-eigvals for eigvals in eigenvalues_set]
         final_status = final_status.replace("positive semidefinite", "negative semidefinite")
 
-        # Prepare the result dictionary after adjustments
+    # Prepare the result dictionary
     result = {
         "matrices": matrices,
         "eigenvalues_set": eigenvalues_set,
         "eigenvectors_set": eigenvectors_set,
         "levels_performed": level,
-        "final_status": final_status
+        "final_status": final_status,
+        "cumulative_alpha": cumulative_alpha  # Final cumulative alpha value
     }
 
     return result
 
-
-    return result
 
 def solve_qp_with_gurobi(Q, c, A=None, b=None, bounds=None, time_limit=30):
     """
