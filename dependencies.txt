@@ -1,8 +1,7 @@
-import logger
+import logging
 import gurobipy as gp
 import numpy as np
 import numpy.linalg as linalg
-import scipy
 from gurobipy import GRB
 import time
 from scipy.stats import skew, kurtosis
