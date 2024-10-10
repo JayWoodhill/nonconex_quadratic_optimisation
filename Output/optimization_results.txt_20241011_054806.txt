@@ -1,0 +1,82 @@
+Optimization Results:
+n = 5, epsilon = 0.1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.22096681594848633 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.0010013580322265625 seconds
+Improvement percentage: 99.55%
+Objective without rank reduction: -23.873632374924547
+Objective with rank reduction: -28.445591800439445
+Known optimal objective value: -22.47405575166074
+Discrepancy without rank reduction: 1.3995766232638083
+Discrepancy with rank reduction: 5.971536048778706
+Known optimal solution s_star: [-2.55202852 -0.37934725 -2.11424502  3.59593921  1.09912301]
+Solution without rank reduction s_without: [-3.64213343 -1.82028238 -3.1110362   6.          5.78783392]
+Solution with rank reduction s_with: [-3.61148331 -1.73323506 -3.00220454  6.          5.47581116]
+--------------------------------------------------
+n = 5, epsilon = 0.5
+Status without rank reduction: 2
+Computation time without rank reduction: 0.05851578712463379 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.003000974655151367 seconds
+Improvement percentage: 94.87%
+Objective without rank reduction: -94.06672420289513
+Objective with rank reduction: -142124009381.98557
+Known optimal objective value: -46.08947112043465
+Discrepancy without rank reduction: 47.97725308246048
+Discrepancy with rank reduction: 142124009335.8961
+Known optimal solution s_star: [ 0.25521443  2.09652153  4.86398136 -2.96445828 -1.30588925]
+Solution without rank reduction s_without: [-2.6670183  -4.99100904 -6.         -5.6419271  -6.        ]
+Solution with rank reduction s_with: [-6.  6.  6. -6.  6.]
+--------------------------------------------------
+n = 6, epsilon = 0.1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.34156155586242676 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.001999378204345703 seconds
+Improvement percentage: 99.41%
+Objective without rank reduction: -38.984435272104605
+Objective with rank reduction: -1922018527.4038277
+Known optimal objective value: -38.82562302243963
+Discrepancy without rank reduction: 0.15881224966497598
+Discrepancy with rank reduction: 1922018488.5782046
+Known optimal solution s_star: [-2.12360237 -0.04776741  4.79701503 -3.2335648   3.76170885  1.72075653]
+Solution without rank reduction s_without: [-1.97784085 -0.7198489   6.         -3.448061    4.50838114  2.63234342]
+Solution with rank reduction s_with: [-6. -6.  6.  6. -6.  6.]
+--------------------------------------------------
+n = 7, epsilon = 0.5
+Status without rank reduction: 2
+Computation time without rank reduction: 0.514406681060791 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 24.784834623336792 seconds
+Improvement percentage: -4718.14%
+Objective without rank reduction: -61.7904926187029
+Objective with rank reduction: -207605261976.62576
+Known optimal objective value: -32.83142031758826
+Discrepancy without rank reduction: 28.959072301114638
+Discrepancy with rank reduction: 207605261943.79434
+Known optimal solution s_star: [ 3.62011662 -1.60307797 -3.54815024 -1.97587329  1.4205525   0.69209004
+  4.4810356 ]
+Solution without rank reduction s_without: [ 5.35027786 -0.5325657   6.         -6.          6.         -1.78594218
+ -0.56469716]
+Solution with rank reduction s_with: [ 6.         -6.          6.         -6.          6.         -0.22549682
+  6.        ]
+--------------------------------------------------
+n = 8, epsilon = 0.5
+Status without rank reduction: 2
+Computation time without rank reduction: 4.83182954788208 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.394946813583374 seconds
+Improvement percentage: 91.83%
+Objective without rank reduction: -97.0574982629046
+Objective with rank reduction: -38266513725.54504
+Known optimal objective value: -38.88620744230285
+Discrepancy without rank reduction: 58.171290820601754
+Discrepancy with rank reduction: 38266513686.65883
+Known optimal solution s_star: [ 0.59889248  2.09258551 -1.76713745 -0.95126368  0.89903079  5.18663817
+  1.04006487  3.18320898]
+Solution without rank reduction s_without: [-0.9678106  -6.         -1.05466699  1.09527048 -4.14365598 -2.16576615
+ -6.         -4.54837852]
+Solution with rank reduction s_with: [ 6.          6.          6.         -0.85302438  6.          6.
+  6.          6.        ]
+--------------------------------------------------

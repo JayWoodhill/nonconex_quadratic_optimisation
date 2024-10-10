@@ -1,0 +1,118 @@
+Optimization Results:
+n = 3, epsilon = 0.1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.6437034606933594 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.0020170211791992188 seconds
+Improvement percentage: 99.69%
+Objective without rank reduction: -1.2439360154226935
+Objective with rank reduction: -2.359629498503975
+--------------------------------------------------
+n = 3, epsilon = 1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.009980916976928711 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.0010004043579101562 seconds
+Improvement percentage: 89.98%
+Objective without rank reduction: -2.0962623635759168
+Objective with rank reduction: -2.725331747586872
+--------------------------------------------------
+n = 3, epsilon = 0.1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.10352110862731934 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 2.527728319168091 seconds
+Improvement percentage: -2341.75%
+Objective without rank reduction: -0.3967217107819173
+Objective with rank reduction: -100700662.06791264
+--------------------------------------------------
+n = 3, epsilon = 1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.09850406646728516 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.001998424530029297 seconds
+Improvement percentage: 97.97%
+Objective without rank reduction: -1.3275473439931993
+Objective with rank reduction: -2.31685698539981
+--------------------------------------------------
+n = 4, epsilon = 1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.03208041191101074 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 29.75723433494568 seconds
+Improvement percentage: -92658.27%
+Objective without rank reduction: -3.756847517911265
+Objective with rank reduction: -771816799.2297765
+--------------------------------------------------
+n = 4, epsilon = 0.1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.0883936882019043 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.0 seconds
+Improvement percentage: 100.00%
+Objective without rank reduction: -1.4825266788123255
+Objective with rank reduction: -5.126821009195565
+--------------------------------------------------
+n = 4, epsilon = 1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.05623030662536621 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.0 seconds
+Improvement percentage: 100.00%
+Objective without rank reduction: -3.1618554712145874
+Objective with rank reduction: -339398031.63132566
+--------------------------------------------------
+n = 5, epsilon = 0.1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.6976895332336426 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.0 seconds
+Improvement percentage: 100.00%
+Objective without rank reduction: -0.7144254995155197
+Objective with rank reduction: -2.1081411691479746
+--------------------------------------------------
+n = 5, epsilon = 1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.15245294570922852 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.008003950119018555 seconds
+Improvement percentage: 94.75%
+Objective without rank reduction: -3.621190832556441
+Objective with rank reduction: -9.733577409214776
+--------------------------------------------------
+n = 5, epsilon = 0.1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.07224130630493164 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.007898807525634766 seconds
+Improvement percentage: 89.07%
+Objective without rank reduction: -1.199721275517436
+Objective with rank reduction: -2.820430945014766
+--------------------------------------------------
+n = 6, epsilon = 0.1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.6099207401275635 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.008041143417358398 seconds
+Improvement percentage: 98.68%
+Objective without rank reduction: -1.850158490088688
+Objective with rank reduction: -3.318591664515498
+--------------------------------------------------
+n = 6, epsilon = 1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.1762526035308838 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.056183576583862305 seconds
+Improvement percentage: 68.12%
+Objective without rank reduction: -3.719769298259252
+Objective with rank reduction: -31094095426.906586
+--------------------------------------------------
+n = 6, epsilon = 1
+Status without rank reduction: 2
+Computation time without rank reduction: 0.8648264408111572 seconds
+Status with rank reduction: 2
+Computation time with rank reduction: 0.007999897003173828 seconds
+Improvement percentage: 99.07%
+Objective without rank reduction: -1.7559453581839621
+Objective with rank reduction: -72484617874.45998
+--------------------------------------------------
