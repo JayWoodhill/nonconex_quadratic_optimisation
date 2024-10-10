@@ -41,6 +41,12 @@ def save_results_to_file(results, filename='results.txt'):
             f.write(f"Improvement percentage: {result.get('improvement_percentage', 'N/A'):.2f}%\n")
             f.write(f"Objective without rank reduction: {result.get('objective_without', 'N/A')}\n")
             f.write(f"Objective with rank reduction: {result.get('objective_with', 'N/A')}\n")
+            f.write(f"Known optimal objective value: {result.get('obj_star', 'N/A')}\n")
+            f.write(f"Discrepancy without rank reduction: {result.get('discrepancy_without', 'N/A')}\n")
+            f.write(f"Discrepancy with rank reduction: {result.get('discrepancy_with', 'N/A')}\n")
+            f.write(f"Known optimal solution s_star: {result.get('s_star', 'N/A')}\n")
+            f.write(f"Solution without rank reduction s_without: {result.get('s_without', 'N/A')}\n")
+            f.write(f"Solution with rank reduction s_with: {result.get('s_with', 'N/A')}\n")
             f.write("-" * 50 + "\n")
 
     print(f"Results saved to {filename}.")
@@ -68,6 +74,9 @@ def solve_qp_with_gurobi(Q, c, A=None, b=None, Aeq=None, beq=None, bounds=None, 
         n = len(c)
         model = gp.Model()
         model.Params.OutputFlag = 0  # Suppress Gurobi output
+
+        # Allow non-convex quadratic objectives
+        model.Params.NonConvex = 2
 
         # Add variables with bounds
         if bounds is not None:
@@ -135,6 +144,60 @@ def solve_qp_with_gurobi(Q, c, A=None, b=None, Aeq=None, beq=None, bounds=None, 
             "error": str(e)
         }
 
+    except Exception as e:
+        logger.exception(f"Error during optimization: {e}")
+        return {
+            "status": None,
+            "objective_value": None,
+            "variable_values": None,
+            "computation_time": time.time() - start_time,
+            "error": str(e)
+        }
+
+def generate_problem_with_known_solution(n, epsilon):
+    """
+    Generates a QP problem with a known optimal solution.
+
+    Parameters:
+    - n (int): Dimension of the problem.
+    - epsilon (float): Magnitude of the small negative eigenvalue.
+
+    Returns:
+    - Q (numpy.ndarray): Quadratic coefficient matrix.
+    - c (numpy.ndarray): Linear coefficient vector.
+    - A (numpy.ndarray): Constraint matrix.
+    - b (numpy.ndarray): Constraint vector.
+    - s_star (numpy.ndarray): Known optimal solution.
+    - obj_star (float): Known optimal objective value.
+    """
+    # Known solution
+    s_star = np.random.uniform(-5, 5, size=n)  # Ensure the solution is within bounds
+
+    # Generate random positive definite matrix
+    A_random = np.random.randn(n, n)
+    Q_posdef = A_random.T @ A_random
+
+    # Modify eigenvalues to introduce a small negative eigenvalue
+    eigvals, eigvecs = np.linalg.eigh(Q_posdef)
+    eigvals[0] = -epsilon  # Introduce negative eigenvalue
+    Q_problematic = eigvecs @ np.diag(eigvals) @ eigvecs.T
+    Q_problematic = (Q_problematic + Q_problematic.T) / 2  # Ensure symmetry
+
+    # Compute c based on known solution
+    c = -Q_problematic @ s_star
+
+    # Constraints A s = b
+    A = np.random.randn(1, n)
+    b = A @ s_star
+
+    # Variable bounds
+    bounds = [(-10.0, 10.0) for _ in range(n)]
+
+    # Compute the known objective value
+    obj_star = 0.5 * s_star.T @ Q_problematic @ s_star + c.T @ s_star
+
+    return Q_problematic, c, A, b, bounds, s_star, obj_star
+
 def run_multiple_tests(num_tests, n_range, epsilon_range):
     """
     Runs multiple tests to compare the optimization performance with and without rank reduction.
@@ -152,49 +215,74 @@ def run_multiple_tests(num_tests, n_range, epsilon_range):
     for n in range(n_range[0], n_range[1] + 1):
         for _ in range(num_tests):
             for epsilon in epsilon_range:
-                # Generate problematic Q matrix with a small negative eigenvalue
-                Q_problematic = generate_Q_with_small_negative_eigenvalue(n, epsilon)
-                c = np.random.randn(n)
-                A = np.random.randn(1, n)
-                b = np.array([np.random.rand() * n])
-                bounds = [(-1.0, 1.0) for _ in range(n)]
+                # Generate problem with known solution
+                Q_problematic, c, A, b, bounds, s_star, obj_star = generate_problem_with_known_solution(n, epsilon)
 
                 # Solve without rank reduction
                 result_without_reduction = solve_qp_with_gurobi(Q_problematic, c, A=A, b=b, bounds=bounds)
+                if result_without_reduction is None or result_without_reduction['status'] != GRB.OPTIMAL:
+                    logger.warning(f"Solver did not find an optimal solution without rank reduction for n={n}, epsilon={epsilon}")
+                    continue  # Skip to the next iteration
+
                 status_without = result_without_reduction['status']
-                time_without = result_without_reduction['computation_time'] if status_without == GRB.OPTIMAL else None
+                time_without = result_without_reduction['computation_time']
                 objective_without = result_without_reduction['objective_value']
+                s_without = result_without_reduction['variable_values']
 
                 # Apply rank reduction with c adjustment
-                reduction_result = iterative_rank_reduction_with_c(Q_problematic, c, A=A, b=b, mode='convex')
+                reduction_result = iterative_rank_reduction_with_c(Q_problematic, c, A=A, b=b)
                 Q_psd = reduction_result['adjusted_q']
                 c_adjusted = reduction_result['adjusted_c']
 
                 # Solve with rank-reduced Q and adjusted c
                 result_with_reduction = solve_qp_with_gurobi(Q_psd, c_adjusted, A=A, b=b, bounds=bounds)
+                if result_with_reduction is None or result_with_reduction['status'] != GRB.OPTIMAL:
+                    logger.warning(f"Solver did not find an optimal solution with rank reduction for n={n}, epsilon={epsilon}")
+                    continue  # Skip to the next iteration
+
                 status_with = result_with_reduction['status']
-                time_with = result_with_reduction['computation_time'] if status_with == GRB.OPTIMAL else None
+                time_with = result_with_reduction['computation_time']
                 objective_with = result_with_reduction['objective_value']
+                s_with = result_with_reduction['variable_values']
 
                 # Get rank before and after reduction
                 initial_rank = np.linalg.matrix_rank(Q_problematic)
                 reduced_rank = np.linalg.matrix_rank(Q_psd)
 
-                # Store the results only if both solvers were successful
-                if time_without is not None and time_with is not None:
-                    results.append({
-                        'n': n,
-                        'epsilon': epsilon,
-                        'initial_rank': initial_rank,
-                        'reduced_rank': reduced_rank,
-                        'time_without': time_without,
-                        'time_with': time_with,
-                        'improvement_percentage': ((time_without - time_with) / time_without) * 100,
-                        'objective_without': objective_without,
-                        'objective_with': objective_with,
-                        'status_without': status_without,
-                        'status_with': status_with
-                    })
+                # Validate objective values
+                discrepancy_without = np.abs(objective_without - obj_star)
+                discrepancy_with = np.abs(objective_with - obj_star)
+
+                # Store the results
+                results.append({
+                    'n': n,
+                    'epsilon': epsilon,
+                    'initial_rank': initial_rank,
+                    'reduced_rank': reduced_rank,
+                    'time_without': time_without,
+                    'time_with': time_with,
+                    'improvement_percentage': ((time_without - time_with) / time_without) * 100 if time_without else None,
+                    'objective_without': objective_without,
+                    'objective_with': objective_with,
+                    'status_without': status_without,
+                    'status_with': status_with,
+                    'discrepancy_without': discrepancy_without,
+                    'discrepancy_with': discrepancy_with,
+                    'obj_star': obj_star,
+                    's_star': s_star,
+                    's_without': s_without,
+                    's_with': s_with
+                })
+
+                # Report discrepancies
+                tolerance = 1e-6
+                if discrepancy_without > tolerance:
+                    print(f"[Warning] Objective discrepancy without rank reduction exceeds tolerance for n={n}, epsilon={epsilon}")
+                if discrepancy_with > tolerance:
+                    print(f"[Warning] Objective discrepancy with rank reduction exceeds tolerance for n={n}, epsilon={epsilon}")
+                obj_diff = np.abs(objective_without - objective_with)
+                if obj_diff > tolerance:
+                    print(f"[Warning] Objective values differ after rank reduction by {obj_diff} for n={n}, epsilon={epsilon}")
 
     return results
 
@@ -249,10 +337,9 @@ def calculate_average_improvement_by_rank(results):
     return avg_improvement_by_rank
 
 if __name__ == '__main__':
-
-    num_tests = 2
-    n_range = (4, 8)
-    epsilon_range = [1e-1, 1, 2]
+    num_tests = 2  # Number of tests for each (n, epsilon) combination
+    n_range = (3, 6)  # Range of matrix sizes n to test
+    epsilon_range = [1e-1, 1]  # Range of epsilon values to test
 
     # Run multiple tests and collect results
     results = run_multiple_tests(num_tests, n_range, epsilon_range)
