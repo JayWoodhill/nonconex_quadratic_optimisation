@@ -80,7 +80,7 @@ def gurobi_solve(
 ):
     n = len(linear_coeff)
     mdl = gp.Model()
-    x = [mdl.addVar(lb=0, ub=1) for _ in range(n)]
+    x = [mdl.addVar(vtype=GRB.BINARY) for _ in range(n)]
     mdl.addConstr(sum(x[i] * linear_coeff[i] for i in range(n)) == linear_rhs)
     mdl.setObjective(
         sum(matrix[i, j] * x[i] * x[j] for i in range(n) for j in range(n))
@@ -156,7 +156,7 @@ def test_iterative_eigen_squeeze(verbose=False):
 
 def test_gurobi_solve():
     for _ in range(10):
-        n = 50
+        n = 25
         original_matrix = np.random.randint(-100, 100, size=(n, n))
         original_matrix += original_matrix.T  # (make it symetric)
         linear_coeffs = np.ones(n)
