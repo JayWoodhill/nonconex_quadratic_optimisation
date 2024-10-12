@@ -1,0 +1,20 @@
+[tool.poetry]
+name = "math3008-qp"
+version = "0.1.0"
+description = ""
+authors = ["Your Name <you@example.com>"]
+readme = "README.md"
+package-mode = false
+
+[tool.poetry.dependencies]
+python = "^3.12"
+gurobipy = "^11.0.3"
+numpy = "^2.1.2"
+scipy = "^1.14.1"
+pandas = "^2.2.3"
+matplotlib = "^3.9.2"
+
+
+[build-system]
+requires = ["poetry-core"]
+build-backend = "poetry.core.masonry.api"
