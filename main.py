@@ -1,72 +1,200 @@
-import gurobipy as gp
 import numpy as np
-import numpy.linalg as linalg
-import scipy
+import gurobipy as gp
 from gurobipy import GRB
-from spectral_perturbation_analyser import gen_real_constrained_matrix, matrix_checks, iterative_rank_reduction
+import logging
+import time
 
 
-def solve_quadratic(Q, matrix_name="matrix"):
-    try:
-        eigenvalues = np.linalg.eigvals(Q)
+FLOAT_TOL = 1e-10
+RELATIVE_EIGEN_TOL = 1e-4
+RELAXED_FLOAT_TOL = 1e-1
+MAX_ITERATION = 9999
 
-        '''if np.any(eigenvalues < 0):
-            print(f"Matrix '{matrix_name}' is non-convex (contains negative eigenvalues), refusing to solve.")
-            return'''
+logging.basicConfig(level=logging.INFO, format='%(message)s')
+logger = logging.getLogger()
 
-        model = gp.Model("Qp")
-        n = Q.shape[0]
-        x = model.addMVar(shape=n, lb=-GRB.INFINITY, ub=GRB.INFINITY, name="x")
-        obj = x @ Q @ x
-        model.setObjective(obj, GRB.MINIMIZE)
-        model.addConstr(x.sum() == 1, name="sum_constraint")
-        model.setParam('TimeLimit', 100)
-        model.optimize()
+def nonzero_eigenvalues(evals):
+    return np.where(np.abs(evals) > FLOAT_TOL)[0]
 
-        if model.status == GRB.OPTIMAL:
-            solution = x.X
-            print(f"Optimal solution for {matrix_name}: {solution}")
-            print(f"Objective value for {matrix_name}: {model.objVal}")
-        elif model.status == GRB.TIME_LIMIT:
-            print(f"Solver timed out after 10 seconds for {matrix_name}.")
-        else:
-            print(f"No optimal solution found for {matrix_name}. Status: {model.status}")
+def relative_nonzero_eigenvalues(evals):
+    relative_evals = np.abs(evals) / np.sum(np.abs(evals))
+    return np.where(relative_evals > RELATIVE_EIGEN_TOL)[0]
 
-    except gp.GurobiError as e:
-        print(f"Gurobi error in solving {matrix_name}: {e}")
-    except Exception as e:
-        print(f"An error occurred in solving {matrix_name}: {e}")
 
-def verify_solution(Q, solution):
-    if solution is not None:
-        result = solution @ Q @ solution
-        print(f"Solution verification (x^T Q x) result: {result}")
+def iterative_eigen_squeeze(
+    mat: np.ndarray, linear_coeffs: np.ndarray, linear_rhs: float
+):
+    # Avoid mutating mat
+    mat = np.copy(mat).astype(float)
+
+    # Initialize offset
+    offset = np.zeros_like(linear_coeffs).astype(float)
+
+    # Initialize eigenvalues history
+    eigenvalues_history = []
+
+    # Save previous state
+    prev_mat = mat
+    prev_offset = offset
+
+    iterations = 1
+    while iterations <= MAX_ITERATION:
+        # Get eigenvalues and eigenvectors
+        evals, evecs = np.linalg.eig(mat)
+
+        # Record eigenvalues history
+        eigenvalues_history.append(np.sort(evals.real))
+
+        # Check for complex eigenvalues
+        if np.any(np.iscomplex(evals)):
+            return prev_mat, prev_offset, iterations - 1, eigenvalues_history
+
+        # Get significant eigenvalues
+        nonzero_evals_index = relative_nonzero_eigenvalues(evals)
+        evals = evals[nonzero_evals_index]
+        evecs = evecs[:, nonzero_evals_index]
+
+        # Check if already concave (negative semidefinite)
+        if np.all(evals <= FLOAT_TOL):
+            return mat, offset, iterations, eigenvalues_history
+
+        # Identify the largest positive eigenvalue
+        squeezing_eval_index = np.argmax(evals)
+        squeezing_eval = evals[squeezing_eval_index]
+        squeezing_evec = evecs[:, squeezing_eval_index]
+
+        # Determine alpha
+        _denominator = squeezing_evec.dot(linear_coeffs)
+        if abs(_denominator) < FLOAT_TOL:
+            return mat, offset, iterations, eigenvalues_history
+
+        alpha = -squeezing_eval / _denominator
+
+        # Save previous
+        prev_mat = np.copy(mat)
+        prev_offset = np.copy(offset)
+
+        # Update matrix
+        mat += alpha * np.outer(squeezing_evec, linear_coeffs)
+
+        # Update offset
+        offset -= alpha * linear_rhs * squeezing_evec
+
+        iterations += 1
+
+    # If maximum iterations reached, return current state
+    return mat, offset, iterations, eigenvalues_history
+1
+
+def get_status_message(status_code):
+    """Map Gurobi status codes to status messages."""
+    status_messages = {
+        GRB.LOADED: "LOADED",
+        GRB.OPTIMAL: "OPTIMAL",
+        GRB.INFEASIBLE: "INFEASIBLE",
+        GRB.UNBOUNDED: "UNBOUNDED",
+        GRB.INF_OR_UNBD: "INF_OR_UNBD",
+        GRB.CUTOFF: "CUTOFF",
+        GRB.ITERATION_LIMIT: "ITERATION_LIMIT",
+        GRB.NODE_LIMIT: "NODE_LIMIT",
+        GRB.TIME_LIMIT: "TIME_LIMIT",
+        GRB.SOLUTION_LIMIT: "SOLUTION_LIMIT",
+        GRB.INTERRUPTED: "INTERRUPTED",
+        GRB.NUMERIC: "NUMERIC",
+        GRB.SUBOPTIMAL: "SUBOPTIMAL",
+        GRB.INPROGRESS: "INPROGRESS",
+        GRB.USER_OBJ_LIMIT: "USER_OBJ_LIMIT",
+    }
+    return status_messages.get(status_code, f"STATUS_{status_code}")
+
+def gurobi_solve(
+    matrix: np.ndarray,
+    linear_objective: np.ndarray,
+    linear_coeff: np.ndarray,
+    linear_rhs: float,
+    variable_type=GRB.BINARY,
+    sense=GRB.MAXIMIZE,
+):
+    n = len(linear_coeff)
+    mdl = gp.Model()
+    x = mdl.addVars(n, vtype=variable_type, name="x")
+    mdl.addConstr(gp.quicksum(x[i] * linear_coeff[i] for i in range(n)) == linear_rhs, name="LinearConstraint")
+    mdl.setObjective(
+        gp.quicksum(matrix[i, j] * x[i] * x[j] for i in range(n) for j in range(n))
+        + gp.quicksum(linear_objective[i] * x[i] for i in range(n)),
+        sense=sense,
+    )
+
+    # Suppress Gurobi output
+    mdl.setParam("OutputFlag", 0)
+
+    # Start timing
+    start_time = time.time()
+    mdl.optimize()
+    end_time = time.time()
+    runtime = end_time - start_time
+
+    # Get the status
+    status = mdl.Status
+    status_message = get_status_message(status)
+
+    if status != GRB.OPTIMAL:
+        logger.warning(f"Model did not solve to optimality. Status: {status_message}")
+        return None, runtime, status_message, None
+
+    # Get the objective value and solution
+    obj_val = mdl.ObjVal
+    x_values = np.array([x[i].X for i in range(n)])
+
+    return obj_val, runtime, status_message, x_values
+
+def analyse_matrix(matrix: np.ndarray, linear_coeffs: np.ndarray, linear_rhs: float):
+    n = matrix.shape[0]
+    logger.info(f"\nAnalysing a matrix of size {n}x{n}")
+
+    # Calculate eigenvalues of the original matrix
+    original_evals = np.linalg.eigvals(matrix)
+    num_positive_eigenvalues = np.sum(original_evals > FLOAT_TOL)
+    eigenvalue_density = num_positive_eigenvalues / n
+    logger.info(f"Eigenvalue density (positive eigenvalues / size): {eigenvalue_density:.4f}")
+
+    # Apply iterative_eigen_squeeze
+    squeezed_matrix, offset, iterations, eigenvalues_history = iterative_eigen_squeeze(
+        matrix, linear_coeffs, linear_rhs
+    )
+    logger.info(f"Number of steps of rank reduction: {iterations}")
+
+    # Solve using Gurobi for original matrix
+    obj_orig, runtime_orig, status_orig, x_orig = gurobi_solve(
+        matrix, np.zeros(n), linear_coeffs, linear_rhs
+    )
+    logger.info(f"Gurobi Original - Status: {status_orig}, Runtime: {runtime_orig:.4f}s, Objective: {obj_orig}")
+
+    # Solve using Gurobi for squeezed matrix
+    obj_squeezed, runtime_squeezed, status_squeezed, x_squeezed = gurobi_solve(
+        squeezed_matrix, offset, linear_coeffs, linear_rhs
+    )
+    logger.info(f"Gurobi Squeezed - Status: {status_squeezed}, Runtime: {runtime_squeezed:.4f}s, Objective: {obj_squeezed}")
+
+    # Check if objective values are close
+    if obj_orig is not None and obj_squeezed is not None:
+        obj_diff = abs(obj_orig - obj_squeezed)
+        logger.info(f"Difference in objective values: {obj_diff:.4e}")
     else:
-        print("No solution to verify.")
+        obj_diff = None
 
-def verify_solution(Q, solution, gurobi_obj_value):
-    if solution is not None:
-        manual_obj_value = solution @ Q @ solution
-        print(f"Recomputed objective value (x^T Q x): {manual_obj_value}")
-        print(f"Gurobi's objective value: {gurobi_obj_value}")
-        if np.isclose(manual_obj_value, gurobi_obj_value, atol=1e-5):
-            print("The solution is verified as correct.")
-        else:
-            print("The solution does not match the expected objective value.")
-    else:
-        print("No solution to verify.")
+    # Collect data for analysis
+    result = {
+        "Size": n,
+        "Eigenvalue Density": eigenvalue_density,
+        "Rank Reduction Steps": iterations,
+        "Original Objective": obj_orig,
+        "Squeezed Objective": obj_squeezed,
+        "Objective Difference": obj_diff,
+        "Original Runtime (s)": runtime_orig,
+        "Squeezed Runtime (s)": runtime_squeezed,
+        "Original Status": status_orig,
+        "Squeezed Status": status_squeezed,
+    }
 
-n = 7
-u = 6
-v = 1
-
-Q = gen_real_constrained_matrix(n, u, v)
-print(np.linalg.eig(Q)[0])
-
-initial_check = matrix_checks(Q)
-
-Q = iterative_rank_reduction(Q)["matrices"][-1]
-print(np.linalg.eig(Q)[0])
-
-Q = (Q + Q.T)
-print(np.linalg.eig(Q)[0])
+    return result

@@ -152,31 +152,25 @@ def analyse_matrix(matrix: np.ndarray, linear_coeffs: np.ndarray, linear_rhs: fl
     n = matrix.shape[0]
     logger.info(f"\nAnalysing a matrix of size {n}x{n}")
 
-    # Calculate eigenvalues of the original matrix
-    original_evals = np.linalg.eigvals(matrix)
-    num_positive_eigenvalues = np.sum(original_evals > FLOAT_TOL)
-    eigenvalue_density = num_positive_eigenvalues / n
-    logger.info(f"Eigenvalue density (positive eigenvalues / size): {eigenvalue_density:.4f}")
-
-    # Apply iterative_eigen_squeeze
-    squeezed_matrix, offset, iterations, eigenvalues_history = iterative_eigen_squeeze(
-        matrix, linear_coeffs, linear_rhs
-    )
-    logger.info(f"Number of steps of rank reduction: {iterations}")
-
-    # Solve using Gurobi for original matrix
+    # Solve using Gurobi for the original matrix
     obj_orig, runtime_orig, status_orig, x_orig = gurobi_solve(
         matrix, np.zeros(n), linear_coeffs, linear_rhs
     )
     logger.info(f"Gurobi Original - Status: {status_orig}, Runtime: {runtime_orig:.4f}s, Objective: {obj_orig}")
 
-    # Solve using Gurobi for squeezed matrix
+    # Apply the iterative eigenvalue squeezing to process the matrix
+    squeezed_matrix, offset, iterations, eigenvalues_history = iterative_eigen_squeeze(
+        matrix, linear_coeffs, linear_rhs
+    )
+    logger.info(f"Number of steps of rank reduction: {iterations}")
+
+    # Solve using Gurobi for the squeezed matrix
     obj_squeezed, runtime_squeezed, status_squeezed, x_squeezed = gurobi_solve(
         squeezed_matrix, offset, linear_coeffs, linear_rhs
     )
     logger.info(f"Gurobi Squeezed - Status: {status_squeezed}, Runtime: {runtime_squeezed:.4f}s, Objective: {obj_squeezed}")
 
-    # Check if objective values are close
+    # Compare results: objectives, runtimes, and solver status
     if obj_orig is not None and obj_squeezed is not None:
         obj_diff = abs(obj_orig - obj_squeezed)
         logger.info(f"Difference in objective values: {obj_diff:.4e}")
@@ -186,7 +180,7 @@ def analyse_matrix(matrix: np.ndarray, linear_coeffs: np.ndarray, linear_rhs: fl
     # Collect data for analysis
     result = {
         "Size": n,
-        "Eigenvalue Density": eigenvalue_density,
+        "Eigenvalue Density": np.sum(np.linalg.eigvals(matrix) > FLOAT_TOL) / n,
         "Rank Reduction Steps": iterations,
         "Original Objective": obj_orig,
         "Squeezed Objective": obj_squeezed,
@@ -199,109 +193,3 @@ def analyse_matrix(matrix: np.ndarray, linear_coeffs: np.ndarray, linear_rhs: fl
 
     return result
 
-'''def gurobi_solve(
-    matrix: np.ndarray,
-    linear_objective: np.ndarray,
-    linear_coeff: np.ndarray,
-    linear_rhs: np.ndarray,
-):
-    n = len(linear_coeff)
-    mdl = gp.Model()
-    x = [mdl.addVar(vtype=GRB.BINARY) for _ in range(n)]
-    mdl.addConstr(sum(x[i] * linear_coeff[i] for i in range(n)) == linear_rhs)
-    mdl.setObjective(
-        sum(matrix[i, j] * x[i] * x[j] for i in range(n) for j in range(n))
-        + sum(linear_objective[i] * x[i] for i in range(n)),
-        gp.GRB.MAXIMIZE,
-    )
-
-    # solve and return
-    mdl.setParam("OutputFlag", 0)
-    mdl.optimize()
-
-    if mdl.status != gp.GRB.OPTIMAL:
-        raise Exception("Something went wrong, model did not solve")
-
-    return mdl.objVal, mdl.Runtime'''
-
-
-'''def test_iterative_eigen_squeeze(verbose=False):
-    # generate a random symetric matrix
-    for _ in range(100):
-        # Setup parameters
-        n = 100
-        original_matrix = np.random.randint(-100, 100, size=(n, n))
-        original_matrix += original_matrix.T  # (make it symetric)
-        linear_coeffs = np.random.randint(-100, 100, size=n)
-        linear_rhs = np.random.randint(-100, 100)
-
-        # Find squeezed matrix
-        squeezed_matrix, offset, iterations = iterative_eigen_squeeze(
-            original_matrix, linear_coeffs, linear_rhs
-        )
-
-        # Check it operated as expected on eigenvalues
-        original_evals = relative_nonzero_eigenvalues(
-            np.linalg.eig(original_matrix).eigenvalues
-        )
-        num_original_problematic_eigens = np.sum(original_evals > FLOAT_TOL)
-        squeezed_evals = relative_nonzero_eigenvalues(
-            np.linalg.eig(squeezed_matrix).eigenvalues
-        )
-        num_squeezed_problematic_eigens = np.sum(squeezed_evals > FLOAT_TOL)
-
-        if verbose:
-            print(
-                f"Remove {num_original_problematic_eigens - num_squeezed_problematic_eigens} eigenvalues"
-            )
-
-        assert iterations > 1
-        if iterations > 2:
-            # If we have hit 2 iterations, MUST have removed at least one problematic
-            assert num_original_problematic_eigens > num_squeezed_problematic_eigens
-        else:
-            assert num_original_problematic_eigens >= num_squeezed_problematic_eigens
-
-        # Check that function values match
-        for _ in range(100):
-            # Generate a random x that satisfies our constraint
-            x = np.random.randint(0, 100, size=n).astype(float)
-            # Find a component with nonzero entry
-            nonzero_coeff_index = np.where(linear_coeffs)[0][0]
-            # update respective x component to make sure sums match
-            x[nonzero_coeff_index] = 0
-            x[nonzero_coeff_index] = (
-                linear_rhs - x.dot(linear_coeffs)
-            ) / linear_coeffs[nonzero_coeff_index]
-            assert abs(x.dot(linear_coeffs) - linear_rhs) < FLOAT_TOL
-
-            # Now we know x satisfies our constraint, check its fn value matches
-            original_value = x @ original_matrix @ x
-            squeezed_value = x @ squeezed_matrix @ x + x @ offset
-            assert abs(original_value - squeezed_value) < RELAXED_FLOAT_TOL'''
-
-
-'''def test_gurobi_solve():
-    for _ in range(10):
-        n = 25
-        original_matrix = np.random.randint(-100, 100, size=(n, n))
-        original_matrix += original_matrix.T  # (make it symetric)
-        linear_coeffs = np.ones(n)
-        linear_rhs = np.random.randint(2, n - 1)
-        # Find squeezed matrix
-        squeezed_matrix, offset, iterations = iterative_eigen_squeeze(
-            original_matrix, linear_coeffs, linear_rhs
-        )
-        obj_orig, runtime_orig = gurobi_solve(
-            original_matrix, np.zeros(n), linear_coeffs, linear_rhs
-        )
-        obj_squeezed, runtime_squeezed = gurobi_solve(
-            squeezed_matrix, offset, linear_coeffs, linear_rhs
-        )
-        assert abs(obj_orig - obj_squeezed) < RELAXED_FLOAT_TOL
-        print(f"orig : {runtime_orig}\tsqueezed : {runtime_squeezed}")'''
-
-
-'''if __name__ == "__main__":
-    test_iterative_eigen_squeeze()
-    test_gurobi_solve()'''

@@ -37,7 +37,6 @@ def get_status_message(status_code):
     return status_messages.get(status_code, f"STATUS_{status_code}")
 def test_matrices():
     results = []
-    #sizes = [5, 10, 21, 22, 23, 24, 25, 26, 27, 28, 39, 30]  # Adjust sizes as needed
     sizes = list(range(5, 15, 1))
 
     for n in sizes:
@@ -50,23 +49,38 @@ def test_matrices():
         result = analyse_matrix(random_matrix, linear_coeffs, linear_rhs)
         results.append(result)
 
-
     df = pd.DataFrame(results)
+
+    # Convert columns to numeric types
+    numeric_columns = ['Size', 'Eigenvalue Density', 'Rank Reduction Steps',
+                       'Original Objective', 'Squeezed Objective', 'Objective Difference',
+                       'Original Runtime (s)', 'Squeezed Runtime (s)']
+    df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
+
+    # Compute % Solve Time Difference
+    df['% Solve Time Difference'] = ((df['Squeezed Runtime (s)'] - df['Original Runtime (s)']) / df['Original Runtime (s)']) * 100
+
+    # Handle infinite and NaN values
+    df.replace([np.inf, -np.inf], np.nan, inplace=True)
+    df.dropna(subset=['% Solve Time Difference'], inplace=True)
+
     print("\nSummary of Results:")
     print(df)
 
-    # csv outputs
+    # CSV output
     df.to_csv("rank_reduction_analysis_results.csv", index=False)
 
-    # plots
+    # Generate plots
     generate_plots(df)
+
+
 
 def generate_plots(df: pd.DataFrame):
     sns.set(style="whitegrid")
 
     # Plot Eigenvalue Density vs Matrix Size
     plt.figure(figsize=(8, 6))
-    sns.barplot(x="Size", y="Eigenvalue Density", data=df, palette="viridis")
+    sns.barplot(x="Size", y="Eigenvalue Density", data=df)
     plt.title("Eigenvalue Density by Matrix Size")
     plt.ylabel("Eigenvalue Density")
     plt.xlabel("Matrix Size (n)")
@@ -77,7 +91,7 @@ def generate_plots(df: pd.DataFrame):
 
     # Plot Rank Reduction Steps vs Matrix Size
     plt.figure(figsize=(8, 6))
-    sns.barplot(x="Size", y="Rank Reduction Steps", data=df, palette="magma")
+    sns.barplot(x="Size", y="Rank Reduction Steps", data=df)
     plt.title("Rank Reduction Steps by Matrix Size")
     plt.ylabel("Number of Iterations")
     plt.xlabel("Matrix Size (n)")
@@ -85,30 +99,9 @@ def generate_plots(df: pd.DataFrame):
     plt.savefig("rank_reduction_steps.png")
     plt.show()
 
-    # Plot Original vs Squeezed Objective Values
-    plt.figure(figsize=(8, 6))
-    sns.scatterplot(x="Original Objective", y="Squeezed Objective", hue="Size", data=df, palette="deep", s=100)
-    plt.title("Original vs Squeezed Objective Values")
-    plt.xlabel("Original Objective")
-    plt.ylabel("Squeezed Objective")
-    plt.legend(title="Matrix Size")
-    plt.tight_layout()
-    plt.savefig("objective_values_comparison.png")
-    plt.show()
-
-    # Plot Objective Difference vs Matrix Size
-    plt.figure(figsize=(8, 6))
-    sns.barplot(x="Size", y="Objective Difference", data=df, palette="coolwarm")
-    plt.title("Objective Difference by Matrix Size")
-    plt.ylabel("Absolute Difference")
-    plt.xlabel("Matrix Size (n)")
-    plt.tight_layout()
-    plt.savefig("objective_difference.png")
-    plt.show()
-
     # Plot Runtime Comparison
     plt.figure(figsize=(10, 6))
-    width = 0.35  # Width of the bars
+    width = 0.35
     x = np.arange(len(df))
     plt.bar(x - width/2, df["Original Runtime (s)"], width, label='Original', color='skyblue')
     plt.bar(x + width/2, df["Squeezed Runtime (s)"], width, label='Squeezed', color='salmon')
@@ -121,15 +114,18 @@ def generate_plots(df: pd.DataFrame):
     plt.savefig("solver_runtime_comparison.png")
     plt.show()
 
-    # Heatmap of Objective Differences
+    # Heatmap of % Solve Time Differences
     plt.figure(figsize=(8, 6))
-    sns.heatmap(df.pivot("Size", "Rank Reduction Steps", "Objective Difference"), annot=True, fmt=".2e", cmap="YlGnBu")
-    plt.title("Objective Differences Heatmap")
+    pivot_table = df.pivot(index="Size", columns="Rank Reduction Steps", values="% Solve Time Difference")
+    sns.heatmap(pivot_table, annot=True, fmt=".2f", cmap="coolwarm")
+    plt.title("Percentage Solve Time Difference Heatmap")
     plt.xlabel("Rank Reduction Steps")
     plt.ylabel("Matrix Size (n)")
     plt.tight_layout()
-    plt.savefig("objective_differences_heatmap.png")
+    plt.savefig("solve_time_difference_heatmap.png")
     plt.show()
+
+
 
 if __name__ == "__main__":
     test_matrices()
