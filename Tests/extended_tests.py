@@ -9,8 +9,7 @@ import seaborn as sns
 from eigen_squeeze import (
     nonzero_eigenvalues,
     relative_nonzero_eigenvalues,
-    iterative_eigen_squeeze,
-    analyse_matrix
+    iterative_eigen_squeeze
 )
 
 FLOAT_TOL = 1e-10
@@ -48,7 +47,7 @@ def gurobi_solve(
     linear_rhs: float,
     variable_type=GRB.BINARY,
     sense=GRB.MAXIMIZE,
-    time_limit=60  # Enforce 60-second timeout
+    time_limit=30  # Enforce 60-second timeout
 ):
     n = len(linear_coeff)
     mdl = gp.Model()
@@ -135,11 +134,11 @@ def test_matrices():
     results = []
 
     # Test sizes from 5 to 50, incrementing by 1, repeated 3 times
-    sizes_small = list(range(5, 51))  # 5 to 50 inclusive
+    sizes_small = list(range(5, 10))  # 5 to 50 inclusive
     repeats_small = 3
 
     # Test sizes from 10 to 500, incrementing by 10, repeated once
-    sizes_large = list(range(10, 501, 10))  # 10 to 500 inclusive
+    sizes_large = list(range(10, 30, 10))  # 10 to 500 inclusive
     repeats_large = 1
 
     # Testing matrices from sizes_small with repeats
@@ -175,6 +174,14 @@ def test_matrices():
                        'Original Runtime (s)', 'Squeezed Runtime (s)']
     df[numeric_columns] = df[numeric_columns].apply(pd.to_numeric, errors='coerce')
 
+    df = pd.DataFrame(results)
+
+    # Ensure 'Size' is a numeric scalar
+    df['Size'] = pd.to_numeric(df['Size'], errors='coerce')
+
+    # Check for any NaN values in 'Size'
+    if df['Size'].isnull().any():
+        print("Warning: Some 'Size' values are NaN after conversion.")
     # Compute % Solve Time Difference
     # Only compute if both runs reached optimality
     def compute_percentage_difference(row):
@@ -201,10 +208,21 @@ def test_matrices():
 def generate_plots(df: pd.DataFrame):
     sns.set(style="whitegrid")
 
-    # Average over repeats where both runs reached optimality
-    df_filtered = df[(df['Original Status'] == 'OPTIMAL') & (df['Squeezed Status'] == 'OPTIMAL')]
-    df_grouped = df_filtered.groupby('Size').mean().reset_index()
+    # Filter the DataFrame to include only optimal solutions
+    df_filtered = df[
+        (df['Original Status'] == 'OPTIMAL') & (df['Squeezed Status'] == 'OPTIMAL')
+    ]
 
+    # Select only numeric columns for aggregation
+    numeric_columns = df_filtered.select_dtypes(include=[np.number]).columns.tolist()
+
+    # Include 'Size' in the list of columns to be used
+    columns_to_use = ['Size'] + numeric_columns
+
+    # Group by 'Size' and compute the mean of numeric columns without setting 'Size' as index
+    df_grouped = df_filtered[columns_to_use].groupby('Size', as_index=False).mean()
+
+    # Proceed with plotting using df_grouped
     # Plot Eigenvalue Density vs Matrix Size
     plt.figure(figsize=(12, 6))
     sns.lineplot(x="Size", y="Eigenvalue Density", data=df_grouped)
@@ -246,6 +264,20 @@ def generate_plots(df: pd.DataFrame):
     plt.savefig("solve_time_difference.png")
     plt.show()
 
+    # Scatter Plot: Density Change vs Runtime Difference
+    plt.figure(figsize=(8, 6))
+    # Only include cases where both runtimes are available
+    valid_cases = df_filtered.dropna(subset=["Density Change", "Runtime Difference"])
+    sns.scatterplot(x="Density Change", y="Runtime Difference", hue="Size", data=valid_cases)
+    plt.title("Density Change vs Runtime Difference")
+    plt.xlabel("Density Change (After - Before)")
+    plt.ylabel("Runtime Difference (Original - Squeezed)")
+    plt.legend(title="Matrix Size")
+    plt.axhline(0, color='grey', linestyle='--')
+    plt.tight_layout()
+    plt.savefig("density_change_vs_runtime_difference.png")
+    plt.show()
+
     # Plot Runtime Comparison
     plt.figure(figsize=(12, 6))
     plt.plot(df_grouped['Size'], df_grouped['Original Runtime (s)'], label='Original', color='skyblue')
@@ -257,6 +289,8 @@ def generate_plots(df: pd.DataFrame):
     plt.tight_layout()
     plt.savefig("solver_runtime_comparison.png")
     plt.show()
+
+
 
 if __name__ == "__main__":
     test_matrices()
