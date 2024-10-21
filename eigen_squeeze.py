@@ -22,10 +22,10 @@ def iterative_eigen_squeeze(
     # Avoid mutating mat
     mat = np.copy(mat).astype(float)
 
-    # Initialize offset
+    # Initialise offset
     offset = np.zeros_like(linear_coeffs).astype(float)
 
-    # Initialize eigenvalues history
+    # Initialise eigenvalues history
     eigenvalues_history = []
 
     # Save previous state
