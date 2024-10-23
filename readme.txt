@@ -9,7 +9,7 @@ The project aims to:
 ---
 Features
 
--Matrix Generation: Create symmetric matrices with specified eigenvalue distributions.
+- Matrix Generation: Create symmetric matrices with specified eigenvalue distributions.
 - Matrix Analysis: Compute various metrics and characteristics of matrices.
 - Iterative Rank Reduction: Adjust matrices to desired definiteness through iterative updates.
 - Quadratic Programming Solver: Solve QP problems using Gurobi, with and without rank reduction.
